@@ -239,3 +239,42 @@ SELECT * FROM tab t WHERE ... AND t.created = (SELECT MAX(created) FROM tab WHER
 SELECT COUNT(1)/MAX(1)/MIN(1)/... FROM tab WHERE ...
 
 ```
+
+### 对于核销，冲账，再次核销的数据合并展示
+```sql
+-- 项目中总会遇到一些奇葩需求，比如这次的，一张券，由于前台核销时超时，然后执行了撤销，再次核销，成功了。
+-- 那么以上过程，最起码会有三条流水产生，报表要求对于上述记录合并为一条展示，需要对金额字段修改为计算式，类似于“100 = 100 - 100 + 100”。。。
+-- 初看这个要求，一般都会很抵触，感觉是不可能做出来的，不过钻研了一下，还是给项目上做出来了，主要使用了MySQL的group_concat函数，这里做下记录，分享出来。
+-- 简化数据集：
+|ID |券号|   交易时间|    发生金额(撤销交易为负)|
+|---:|:---|:---|:--|
+|1|1|2018-07-11 09:00:00|100|
+|2|1|2018-07-11 09:00:26|-100|
+|3|2|2018-07-11 09:01:12|200|
+|4|1|2018-07-11 09:01:15|100|
+-- 需要将以上三条数据转为两条交易数据：
+|券号|交易时间|发生金额|发生金额明细|
+|:---|:---|:---|:---|
+|1|2018-07-11 09:01:15|100|100 = 100 - 100 + 100|
+|2|2018-07-11 09:01:12|200|200|
+
+-- SQL：
+SELECT
+	vv.voucherid AS 券号,
+	vv.fildate AS 交易时间,
+	vv.occur AS 发生金额,
+	CASE WHEN vv.num = 1 THEN CONCAT(vv.occur,'') ELSE CONCAT(vv.occur,' = ',vv.occurStr) END AS 发生金额明细
+FROM (
+SELECT v.voucherid,MAX(v.fildate) AS fildate,COUNT(*) AS num,SUM(v.occur) AS occur,REPLACE(GROUP_CONCAT(v.occur ORDER BY v.fildate SEPARATOR ' + '),'+ -','- ') AS occurStr
+FROM
+(SELECT 1 AS id,'1' AS voucherid, '2018-07-11 09:00:00' AS fildate,100 AS occur UNION ALL
+SELECT 2,'1','2018-07-11 09:00:26',-100 UNION ALL
+SELECT 3,'2','2018-07-11 09:01:12',200 UNION ALL
+SELECT 4,'1','2018-07-11 09:01:15',100
+)v
+GROUP BY v.voucherid
+) vv
+
+-- 扩展：
+-- 查询如果需要数据合并，一般都是需要对数据进行分组，将同组数据进行合并，我们需要了解较多的聚合函数，不能局限于常用的count,sum,min,max,avg...
+```
