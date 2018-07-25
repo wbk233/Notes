@@ -33,7 +33,7 @@ SELECT '2018-04-18','value1'
 GROUP BY v.occurDate
 ```
 
-#### 按照名称分组时，由于字符串比较是从第一个字符开始往后比较，所以如果长度不一致，排序结果跟我们期望的不一致，此时可以使用LENGTH函数
+#### 按照名称分组时，由于字符串比较是从第一个字符开始往后比较，所以如果长度不一致，排序结果跟我们期望的不一致，此时可以使用CHAR_LENGTH函数
 ```sql
 SELECT
   name
@@ -52,7 +52,7 @@ SELECT '券200'
 UNION ALL
 SELECT '券500'
 ) v
-ORDER BY LENGTH(name),name
+ORDER BY CHAR_LENGTH(name),name
 ```
 
 #### 此处提供一个MySQL的分组函数，主要将数据汇总为按照指定字符分隔的字符串
